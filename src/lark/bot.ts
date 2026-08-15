@@ -26,7 +26,9 @@ export async function startBot(options: BotOptions): Promise<LarkChannel> {
   });
 
   channel.on("message", async (message) => {
-    if (!shouldHandle(message, options.manifest)) return;
+    const eligible = shouldHandle(message, options.manifest);
+    logger.info("Feishu message received", { chatType: message.chatType, mentionedBot: message.mentionedBot, eligible });
+    if (!eligible) return;
     try {
       const result = await options.agent.handle({
         text: message.content.trim(),
@@ -36,6 +38,7 @@ export async function startBot(options: BotOptions): Promise<LarkChannel> {
         mentionsBot: message.mentionedBot
       });
       if (result.text.trim()) await channel.send(message.chatId, { text: result.text.trim() }, { replyTo: message.messageId });
+      logger.info("Feishu message handled", { chatType: message.chatType });
     } catch (error) {
       logger.error("Agent message handling failed", error);
       await channel.send(message.chatId, { text: "处理这条消息时发生了错误，请稍后重试。" }, { replyTo: message.messageId });
