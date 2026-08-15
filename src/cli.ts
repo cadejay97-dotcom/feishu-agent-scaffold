@@ -4,6 +4,13 @@ import { spawn } from "node:child_process";
 import { Command } from "commander";
 import { loadAgent } from "./agent-loader.js";
 import { startBot } from "./lark/bot.js";
+import {
+  BOTMUX_UPSTREAM_VERSION,
+  readBotmuxBridgeConfig,
+  renderBotmuxSetupCommand,
+  runBotmuxSetup,
+  validateBotmuxRuntime
+} from "./integrations/botmux.js";
 import { readModelFile } from "./model/config.js";
 import { ModelRegistry } from "./model/registry.js";
 
@@ -42,6 +49,41 @@ program.command("validate-agent")
     const llm = new ModelRegistry(await readModelFile(models));
     const { manifest } = await loadAgent(agentDir, { llm, logger: console, agentRoot: "" });
     console.log(JSON.stringify({ valid: true, name: manifest.name, triggers: manifest.triggers, defaultModel: manifest.defaultModel ?? null }, null, 2));
+  });
+
+const botmux = program.command("botmux")
+  .description("Bridge an existing local coding CLI to Feishu through BotMux");
+
+botmux.command("validate")
+  .description("Validate a secret-free BotMux bridge config")
+  .requiredOption("--config <path>", "BotMux bridge JSON path")
+  .action(async ({ config }) => {
+    const parsed = await readBotmuxBridgeConfig(config);
+    console.log(JSON.stringify({
+      valid: true,
+      testedBotmuxVersion: BOTMUX_UPSTREAM_VERSION,
+      name: parsed.name,
+      cliId: parsed.cliId,
+      workspaceDir: parsed.workspaceDir,
+      appMode: parsed.app.mode
+    }, null, 2));
+  });
+
+botmux.command("command")
+  .description("Print the upstream botmux setup command without executing it")
+  .requiredOption("--config <path>", "BotMux bridge JSON path")
+  .action(async ({ config }) => {
+    console.log(renderBotmuxSetupCommand(await readBotmuxBridgeConfig(config)));
+  });
+
+botmux.command("deploy")
+  .description("Validate local prerequisites, then run upstream botmux setup add")
+  .requiredOption("--config <path>", "BotMux bridge JSON path")
+  .action(async ({ config }) => {
+    const parsed = await readBotmuxBridgeConfig(config);
+    await validateBotmuxRuntime(parsed);
+    await runBotmuxSetup(parsed);
+    console.log("BotMux setup completed. Run `botmux start` (or `botmux restart`) and verify @Bot in an authorized Feishu chat.");
   });
 
 function requiredEnv(name: string): string {

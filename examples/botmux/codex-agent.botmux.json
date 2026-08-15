@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "name": "codex-production",
+  "cliId": "codex",
+  "workspaceDir": "/absolute/path/to/your/repository",
+  "owners": ["owner@example.com"],
+  "allowedChatGroups": [],
+  "model": "gpt-5-codex",
+  "backend": "tmux",
+  "openPlatformAuto": true,
+  "app": {
+    "mode": "create",
+    "name": "Codex Production Agent",
+    "brand": "feishu"
+  }
+}

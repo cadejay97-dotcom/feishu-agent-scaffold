@@ -13,6 +13,8 @@
 - Anthropic Messages 适配器：Claude 系列。
 - Docker Compose 部署，以及 Agent 合约验证命令。
 
+另有一个仅面向本地 Coding CLI 的 [BotMux bridge](docs/botmux.md)：它依据 BotMux 的真实 `setup add` 配置生成独立的 Feishu Bot 部署命令，支持其当前已适配的 Codex、Claude Code、Gemini、Kimi、OpenCode 等 CLI。它不改写本项目原生 Agent runtime，也不引入 BotMux 的 Dashboard、RAG、记忆或多 Bot 协作能力。
+
 `models.yaml` 只包含模型别名、端点和 API Key 环境变量名。真正的 Key 永远放在部署环境中。
 
 ## 快速开始
