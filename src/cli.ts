@@ -3,6 +3,7 @@ import "dotenv/config";
 import { spawn } from "node:child_process";
 import { Command } from "commander";
 import { loadAgent } from "./agent-loader.js";
+import { generateCountBotArtifacts, loadCountBotIntegration, validateCountBotRuntime } from "./integrations/countbot.js";
 import { startBot } from "./lark/bot.js";
 import { readModelFile } from "./model/config.js";
 import { ModelRegistry } from "./model/registry.js";
@@ -42,6 +43,27 @@ program.command("validate-agent")
     const llm = new ModelRegistry(await readModelFile(models));
     const { manifest } = await loadAgent(agentDir, { llm, logger: console, agentRoot: "" });
     console.log(JSON.stringify({ valid: true, name: manifest.name, triggers: manifest.triggers, defaultModel: manifest.defaultModel ?? null }, null, 2));
+  });
+
+const countbot = program.command("countbot").description("Generate a CountBot direct-routing bridge for an existing CLI Agent");
+
+countbot.command("validate")
+  .description("Validate a CountBot-native external coding Agent declaration")
+  .requiredOption("--agent-dir <path>", "Agent directory containing countbot.agent.json")
+  .action(async ({ agentDir }) => {
+    const integration = await loadCountBotIntegration(agentDir);
+    await validateCountBotRuntime(integration.config);
+    console.log(JSON.stringify({ valid: true, agent: integration.manifest.name, profile: integration.config.profile.name, workspaceDir: integration.config.workspaceDir, accountId: integration.config.bot.accountId, routingMode: "direct" }, null, 2));
+  });
+
+countbot.command("generate")
+  .description("Generate reviewable CountBot profile and Feishu channel deployment artifacts without contacting either service")
+  .requiredOption("--agent-dir <path>", "Agent directory containing countbot.agent.json")
+  .requiredOption("--out <path>", "output directory for CountBot artifacts")
+  .action(async ({ agentDir, out }) => {
+    const integration = await loadCountBotIntegration(agentDir);
+    await generateCountBotArtifacts(agentDir, out);
+    console.log(JSON.stringify({ generated: true, out, profile: integration.config.profile.name, next: "Review generated files, then run node deploy.mjs with CountBot, workspace, and Feishu environment variables." }, null, 2));
   });
 
 function requiredEnv(name: string): string {

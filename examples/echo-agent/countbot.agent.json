@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "workspaceDir": "/absolute/path/to/countbot-workspace",
+  "profile": {
+    "name": "codex-production",
+    "aliases": ["codex"],
+    "command": "codex",
+    "args": ["exec", "--skip-git-repo-check", "--cd", "{working_dir}", "-"],
+    "stdinTemplate": "{prompt}",
+    "inheritEnv": ["OPENAI_API_KEY"],
+    "sessionMode": "history",
+    "historyMessageCount": 10,
+    "timeoutSeconds": 900,
+    "description": "Existing Codex CLI agent for the CountBot workspace."
+  },
+  "bot": {
+    "accountId": "codex-production",
+    "displayName": "Codex Production Agent",
+    "allowFrom": ["replace-with-feishu-open-id"],
+    "appIdEnv": "FEISHU_APP_ID",
+    "appSecretEnv": "FEISHU_APP_SECRET"
+  }
+}

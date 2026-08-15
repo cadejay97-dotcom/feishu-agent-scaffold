@@ -13,6 +13,8 @@
 - Anthropic Messages 适配器：Claude 系列。
 - Docker Compose 部署，以及 Agent 合约验证命令。
 
+另有仅面向已有本地 Coding Agent 的 [CountBot bridge](docs/countbot.md)。它生成 CountBot 原生的 `external_coding_tools.json` profile 及飞书 direct-routing 配置，让飞书 `@Bot` 直接交给已安装、已认证的 Codex、Claude 等 CLI；不会配置 CountBot 的模型、记忆、团队、RAG、工具或管理台。
+
 `models.yaml` 只包含模型别名、端点和 API Key 环境变量名。真正的 Key 永远放在部署环境中。
 
 ## 快速开始
