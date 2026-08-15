@@ -24,20 +24,21 @@ export async function startBot(options: BotOptions): Promise<LarkChannel> {
     },
     safety: { chatQueue: { enabled: true } },
     outbound: { textChunkLimit: 4000 },
-    // The Coding Agent authorization boundary is an Open ID allowlist. Keep
-    // the source event so the original Open ID wins over SDK fallbacks.
+    // The Coding Agent authorization boundary needs the raw Open ID and
+    // tenant-stable union ID, rather than SDK fallbacks alone.
     includeRawEvent: true
   });
 
   channel.on("message", async (message) => {
     const eligible = shouldHandle(message, options.manifest);
-    const senderOpenId = resolveSenderOpenId(message);
+    const sender = resolveSenderIdentity(message);
     logger.info("Feishu message received", {
       chatType: message.chatType,
       mentionedBot: message.mentionedBot,
       eligible,
-      senderIdSource: senderOpenId === message.senderId ? "normalized" : "raw-open-id",
-      senderIdFingerprint: identifierFingerprint(senderOpenId)
+      senderIdSource: sender.openId === message.senderId ? "normalized" : "raw-open-id",
+      senderOpenIdFingerprint: identifierFingerprint(sender.openId),
+      senderUnionIdFingerprint: sender.unionId ? identifierFingerprint(sender.unionId) : null
     });
     if (!eligible) return;
     try {
@@ -45,7 +46,8 @@ export async function startBot(options: BotOptions): Promise<LarkChannel> {
         text: message.content.trim(),
         chatId: message.chatId,
         messageId: message.messageId,
-        senderOpenId,
+        senderOpenId: sender.openId,
+        senderUnionId: sender.unionId,
         mentionsBot: message.mentionedBot
       });
       if (result.text.trim()) await channel.send(message.chatId, { text: result.text.trim() }, { replyTo: message.messageId });
@@ -67,8 +69,15 @@ function shouldHandle(message: NormalizedMessage, manifest: AgentManifest): bool
 }
 
 export function resolveSenderOpenId(message: NormalizedMessage): string {
+  return resolveSenderIdentity(message).openId;
+}
+
+export function resolveSenderIdentity(message: NormalizedMessage): { openId: string; unionId?: string } {
   const raw = message.raw as RawMessageEvent | undefined;
-  return raw?.sender?.sender_id?.open_id || message.senderId;
+  return {
+    openId: raw?.sender?.sender_id?.open_id || message.senderId,
+    unionId: raw?.sender?.sender_id?.union_id || undefined
+  };
 }
 
 function identifierFingerprint(value: string): string {

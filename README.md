@@ -18,7 +18,7 @@
 | 模式 | 入口 | 能做什么 | 不能做什么 | 权限边界 |
 | --- | --- | --- | --- | --- |
 | 最小 Agent 框架 + 自定义 Agent | `feishu-agent run --agent-dir ...`，或 LangBot 声明式部署 | 按 Agent 文件夹的 `createAgent()` 或已确定的 LangBot 提示词处理飞书消息 | 不会把普通 Agent 变成 Coding Agent，不会猜测工具、目录、提示词或权限 | Agent 提供方显式声明模型、依赖、凭据和权限 |
-| 本地 Coding Agent | `feishu-agent codex run` | 搜索/查看/恢复本机 Codex 对话，并在批准的本地目录继续开发 | 不会访问未白名单目录，不会向未授权飞书用户暴露历史，不会自动批准 Codex 的操作 | 飞书 `open_id` 白名单 + 本机目录白名单 + 现有 Codex 审批/沙箱策略 |
+| 本地 Coding Agent | `feishu-agent codex run` | 搜索/查看/恢复本机 Codex 对话，并在批准的本地目录继续开发 | 不会访问未白名单目录，不会向未授权飞书用户暴露历史，不会自动批准 Codex 的操作 | 飞书 `union_id`（多 profile 推荐）或同应用 `open_id` 白名单 + 本机目录白名单 + 现有 Codex 审批/沙箱策略 |
 
 这两种模式不能混淆。前者的最小合约在本 README 的“Agent 文件夹契约”；后者是机器管理员显式接入的本机开发能力，**不接受**任意上传的 Agent 文件夹或 GitHub 仓库来获得本机文件访问权。
 
@@ -43,12 +43,12 @@ npx tsx src/cli.ts codex map show 019ffb0a-849c-7240-a08f-ca975fe171c6
 
 指定验收会话 `019ffb0a-849c-7240-a08f-ca975fe171c6` 会在 App Server 中以其本机标题、工作目录和 29 个可恢复回合出现。它是本功能的首个回归样本，而不是被复制到仓库的测试数据。
 
-启动飞书 Coding Agent 前，机器管理员必须写出允许访问本机历史的飞书用户 `open_id`，以及允许开发的工作目录。不要用群成员列表、Bot 名称或 email 代替 `open_id`。
+启动飞书 Coding Agent 前，机器管理员必须写出允许访问本机历史的飞书用户标识，以及允许开发的工作目录。多 application/profile 部署优先登记租户内稳定的 `union_id`；`open_id` 仅适用于用同一个飞书应用取得和接收事件的标识。不要用群成员列表、Bot 名称或 email 代替这些标识。
 
 ```bash
 FEISHU_APP_ID=... FEISHU_APP_SECRET=... \
   npx tsx src/cli.ts codex run \
-  --allow-open-id ou_authorized_user \
+  --allow-union-id on_authorized_user \
   --allowed-root /absolute/path/to/workspace
 ```
 
@@ -79,7 +79,7 @@ npx tsx src/cli.ts langbot generate --agent-dir examples/echo-agent --out ./gene
 
 `models.yaml` 只包含模型别名、端点和 API Key 环境变量名。真正的 Key 永远放在部署环境中。
 
-LangBot 是本项目优先支持的 IM Agent 宿主之一：它覆盖多 IM、Pipeline、插件、MCP、RAG 与 AgentRunner Protocol v1。但开源生态没有可证明的“绝对最广泛”单一框架，本仓库不会作此声明。对于已确定职责的自定义 Agent，现有 `local-agent` 部署已足够；对于完整 Coding Agent，应使用 LangBot 的**进程外 AgentRunner**把受限的 Codex App Server 桥接进去。该桥接必须继承本文的 `open_id`、目录、审批、超时和密钥隔离边界，不能把 Codex 本机权限交给普通 LangBot Pipeline。
+LangBot 是本项目优先支持的 IM Agent 宿主之一：它覆盖多 IM、Pipeline、插件、MCP、RAG 与 AgentRunner Protocol v1。但开源生态没有可证明的“绝对最广泛”单一框架，本仓库不会作此声明。对于已确定职责的自定义 Agent，现有 `local-agent` 部署已足够；对于完整 Coding Agent，应使用 LangBot 的**进程外 AgentRunner**把受限的 Codex App Server 桥接进去。该桥接必须继承本文的 `union_id`/同应用 `open_id`、目录、审批、超时和密钥隔离边界，不能把 Codex 本机权限交给普通 LangBot Pipeline。
 
 ## 快速开始
 
@@ -228,7 +228,7 @@ claude:
 6. 若输入来自 GitHub：固定 commit/tag、Agent 子目录、锁文件、安装命令和依赖清单分别是什么？是否已在隔离环境验证，而不是运行时临时安装？
 7. 飞书需要哪些精确权限和事件订阅？是否已确认管理员可批准，且不会要求超出业务范围的用户数据访问？
 8. 运行在哪里（本机、Docker、服务器、Kubernetes）？App Secret 与模型 Key 如何存储、轮换、审计？
-9. 若启用本地 Coding Agent：已授权的飞书 `open_id`、允许工作目录、Codex 审批/沙箱策略、历史地图位置与数据留存责任人分别是谁？
+9. 若启用本地 Coding Agent：已授权的飞书 `union_id`（或同应用 `open_id`）、允许工作目录、Codex 审批/沙箱策略、历史地图位置与数据留存责任人分别是谁？
 10. 如何观测失败、限流、模型成本与用户投诉？谁负责停止 Bot、回滚版本和撤销权限？
 11. GitHub 仓库的 owner、可见性、默认分支和协作者权限是否确认？仓库中不得出现任何真实密钥或用户数据。
 

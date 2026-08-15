@@ -9,24 +9,32 @@ export interface CodingAgentOptions {
   historyMap: CodexHistoryMap;
   allowedRoots: string[];
   allowedOpenIds: string[];
+  allowedUnionIds?: string[];
   logger?: Pick<Console, "info">;
 }
 
 export function createCodingAgent(options: CodingAgentOptions): Agent {
   const allowedRoots = options.allowedRoots.map((root) => path.resolve(root));
   const allowedOpenIds = new Set(options.allowedOpenIds);
+  const allowedUnionIds = new Set(options.allowedUnionIds ?? []);
   if (!allowedRoots.length) throw new Error("Coding Agent requires at least one allowed local workspace root");
-  if (!allowedOpenIds.size) throw new Error("Coding Agent requires at least one allowed Feishu open_id");
+  if (!allowedOpenIds.size && !allowedUnionIds.size) throw new Error("Coding Agent requires at least one allowed Feishu open_id or union_id");
   options.logger?.info("Coding Agent authorization initialized", {
-    allowedOpenIdFingerprints: [...allowedOpenIds].map(identifierFingerprint)
+    allowedOpenIdFingerprints: [...allowedOpenIds].map(identifierFingerprint),
+    allowedUnionIdFingerprints: [...allowedUnionIds].map(identifierFingerprint)
   });
 
   return {
     async handle(input: AgentInput): Promise<{ text: string }> {
-      const authorized = allowedOpenIds.has(input.senderOpenId);
+      const authorizedByOpenId = allowedOpenIds.has(input.senderOpenId);
+      const authorizedByUnionId = Boolean(input.senderUnionId && allowedUnionIds.has(input.senderUnionId));
+      const authorized = authorizedByOpenId || authorizedByUnionId;
       options.logger?.info("Coding Agent authorization checked", {
         authorized,
-        senderOpenIdFingerprint: identifierFingerprint(input.senderOpenId)
+        authorizedByOpenId,
+        authorizedByUnionId,
+        senderOpenIdFingerprint: identifierFingerprint(input.senderOpenId),
+        senderUnionIdFingerprint: input.senderUnionId ? identifierFingerprint(input.senderUnionId) : null
       });
       if (!authorized) return { text: "此 Coding Agent 未授权给当前飞书用户。" };
       const message = input.text.trim();

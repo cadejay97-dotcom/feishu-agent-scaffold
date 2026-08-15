@@ -28,6 +28,7 @@ export interface AgentInput {
   chatId: string;
   messageId: string;
   senderOpenId: string;
+  senderUnionId?: string;
   mentionsBot: boolean;
 }
 

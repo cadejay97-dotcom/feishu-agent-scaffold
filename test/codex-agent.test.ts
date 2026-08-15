@@ -21,6 +21,21 @@ test("rejects unauthorized Feishu users before exposing local history", async ()
   assert.equal(client.calls, 0);
 });
 
+test("authorizes the same tenant user by union_id across Feishu application profiles", async () => {
+  const client = new FakeClient("/allowed/project");
+  const agent = createCodingAgent({
+    client,
+    historyMap: new CodexHistoryMap(client, path.join(os.tmpdir(), "unused-union-history-map.json")),
+    allowedRoots: ["/allowed"],
+    allowedOpenIds: [],
+    allowedUnionIds: ["on_allowed"]
+  });
+  const request = input("ou_other_application", "help");
+  request.senderUnionId = "on_allowed";
+  const response = await agent.handle(request);
+  assert.doesNotMatch(response.text, /未授权/);
+});
+
 test("refreshes the local map before showing or searching a Codex conversation", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "codex-agent-query-map-"));
   try {

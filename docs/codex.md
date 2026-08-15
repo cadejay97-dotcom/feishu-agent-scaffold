@@ -6,7 +6,7 @@
 
 ```text
 飞书 @Bot
-  -> Coding Agent（open_id 校验）
+  -> Coding Agent（union_id 或同应用 open_id 校验）
   -> 历史地图（本机、脱敏索引） -> codex app-server: thread/list + thread/read
   -> 恢复或创建会话（目录白名单） -> thread/resume/thread/start + turn/start
   -> Codex 本机审批和沙箱
@@ -23,6 +23,6 @@
 
 LangBot 的 AgentRunner Protocol v1 允许进程外运行器以 run-scoped Host API/MCP bridge 获取被授权的历史、工具和资产。其官方 `langbot-local-agent` 是 LangBot 托管模型的本地 runner，不代表它能任意访问用户电脑。
 
-因此，本仓库的 `langbot` 子命令继续支持**声明式、自定义 Agent**：确定的系统提示、模型 UUID、回退模型和运行限额。完整 Codex Coding Agent 采用本目录的独立 bridge 核心，并且在接入 AgentRunner 时必须保持同样的用户和目录白名单。不能通过 LangBot Pipeline、RAG、插件或 MCP 配置来扩大本机 Codex 的权限。
+因此，本仓库的 `langbot` 子命令继续支持**声明式、自定义 Agent**：确定的系统提示、模型 UUID、回退模型和运行限额。完整 Codex Coding Agent 采用本目录的独立 bridge 核心，并且在接入 AgentRunner 时必须保持同样的 `union_id`/同应用 `open_id` 用户白名单和目录边界。不能通过 LangBot Pipeline、RAG、插件或 MCP 配置来扩大本机 Codex 的权限。
 
 上游状态在实现时已核验：LangBot AgentRunner Protocol v1 及其 4.11.x 相关集成仍在快速演进。部署前必须固定并联测 LangBot、Plugin SDK 和 runner 的兼容版本；本仓库不将当前开发分支当成永久稳定 ABI。

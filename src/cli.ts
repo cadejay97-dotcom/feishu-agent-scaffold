@@ -97,14 +97,16 @@ codex.command("run")
   .description("Run the Feishu Coding Agent backed by local codex app-server")
   .option("--allowed-root <path>", "local workspace root the bot may use (repeatable)", collectOption, [])
   .option("--allow-open-id <id>", "Feishu open_id authorized to access local history (repeatable)", collectOption, [])
+  .option("--allow-union-id <id>", "Feishu tenant-stable union_id authorized to access local history (repeatable)", collectOption, [])
   .option("--history-map <path>", "local history map path", process.env.CODEX_HISTORY_MAP || defaultHistoryMapPath())
-  .action(async ({ allowedRoot, allowOpenId, historyMap }) => {
+  .action(async ({ allowedRoot, allowOpenId, allowUnionId, historyMap }) => {
     const appId = requiredEnv("FEISHU_APP_ID");
     const appSecret = requiredEnv("FEISHU_APP_SECRET");
     const roots = [...allowedRoot, ...splitEnvironmentList(process.env.CODEX_AGENT_ALLOWED_ROOTS)];
     const openIds = [...allowOpenId, ...splitEnvironmentList(process.env.CODEX_AGENT_ALLOWED_OPEN_IDS)];
+    const unionIds = [...allowUnionId, ...splitEnvironmentList(process.env.CODEX_AGENT_ALLOWED_UNION_IDS)];
     const client = new CodexAppServerClient();
-    const agent = createCodingAgent({ client, historyMap: new CodexHistoryMap(client, historyMap), allowedRoots: roots, allowedOpenIds: openIds, logger: console });
+    const agent = createCodingAgent({ client, historyMap: new CodexHistoryMap(client, historyMap), allowedRoots: roots, allowedOpenIds: openIds, allowedUnionIds: unionIds, logger: console });
     await startBot({
       appId,
       appSecret,
