@@ -64,7 +64,7 @@ function shouldHandle(message: NormalizedMessage, manifest: AgentManifest): bool
   return manifest.triggers.includes("direct-message");
 }
 
-function resolveSenderOpenId(message: NormalizedMessage): string {
+export function resolveSenderOpenId(message: NormalizedMessage): string {
   const raw = message.raw as RawMessageEvent | undefined;
   return raw?.sender?.sender_id?.open_id || message.senderId;
 }
