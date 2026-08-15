@@ -43,7 +43,7 @@ export async function startBot(options: BotOptions): Promise<LarkChannel> {
     if (!eligible) return;
     try {
       const result = await options.agent.handle({
-        text: message.content.trim(),
+        text: stripBotMentions(message),
         chatId: message.chatId,
         messageId: message.messageId,
         senderOpenId: sender.openId,
@@ -78,6 +78,13 @@ export function resolveSenderIdentity(message: NormalizedMessage): { openId: str
     openId: raw?.sender?.sender_id?.open_id || message.senderId,
     unionId: raw?.sender?.sender_id?.union_id || undefined
   };
+}
+
+export function stripBotMentions(message: NormalizedMessage): string {
+  const names = message.mentions
+    .filter((mention) => mention.isBot && mention.name)
+    .map((mention) => mention.name!);
+  return names.reduce((content, name) => content.replaceAll(`@${name}`, ""), message.content).trim();
 }
 
 function identifierFingerprint(value: string): string {

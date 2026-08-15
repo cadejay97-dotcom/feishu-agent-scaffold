@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { NormalizedMessage, RawMessageEvent } from "@larksuiteoapi/node-sdk";
-import { resolveSenderIdentity, resolveSenderOpenId } from "../src/lark/bot.js";
+import { resolveSenderIdentity, resolveSenderOpenId, stripBotMentions } from "../src/lark/bot.js";
 
 test("uses the raw Feishu open_id for the Coding Agent authorization boundary", () => {
   const message = normalizedMessage("sdk-fallback-id", {
@@ -19,6 +19,13 @@ test("retains the tenant-stable union_id from the raw Feishu event", () => {
     sender: { sender_id: { open_id: "ou_application", union_id: "on_tenant_user" } }
   }));
   assert.deepEqual(identity, { openId: "ou_application", unionId: "on_tenant_user" });
+});
+
+test("removes repeated Bot mentions before passing a command to the Agent", () => {
+  const message = normalizedMessage("ou_sender");
+  message.content = "@LangBot /history search 对话命名边界@LangBot";
+  message.mentions = [{ key: "@_user_1", name: "LangBot", isBot: true }];
+  assert.equal(stripBotMentions(message), "/history search 对话命名边界");
 });
 
 function normalizedMessage(senderId: string, raw?: Partial<RawMessageEvent>): NormalizedMessage {
