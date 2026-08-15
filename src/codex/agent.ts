@@ -1,4 +1,5 @@
 import path from "node:path";
+import { createHash } from "node:crypto";
 import type { Agent, AgentInput } from "../types.js";
 import { CodexHistoryMap, type HistoryMapEntry } from "./history-map.js";
 import type { CodexRpcClient, CodexThread } from "./types.js";
@@ -8,6 +9,7 @@ export interface CodingAgentOptions {
   historyMap: CodexHistoryMap;
   allowedRoots: string[];
   allowedOpenIds: string[];
+  logger?: Pick<Console, "info">;
 }
 
 export function createCodingAgent(options: CodingAgentOptions): Agent {
@@ -15,10 +17,18 @@ export function createCodingAgent(options: CodingAgentOptions): Agent {
   const allowedOpenIds = new Set(options.allowedOpenIds);
   if (!allowedRoots.length) throw new Error("Coding Agent requires at least one allowed local workspace root");
   if (!allowedOpenIds.size) throw new Error("Coding Agent requires at least one allowed Feishu open_id");
+  options.logger?.info("Coding Agent authorization initialized", {
+    allowedOpenIdFingerprints: [...allowedOpenIds].map(identifierFingerprint)
+  });
 
   return {
     async handle(input: AgentInput): Promise<{ text: string }> {
-      if (!allowedOpenIds.has(input.senderOpenId)) return { text: "此 Coding Agent 未授权给当前飞书用户。" };
+      const authorized = allowedOpenIds.has(input.senderOpenId);
+      options.logger?.info("Coding Agent authorization checked", {
+        authorized,
+        senderOpenIdFingerprint: identifierFingerprint(input.senderOpenId)
+      });
+      if (!authorized) return { text: "此 Coding Agent 未授权给当前飞书用户。" };
       const message = input.text.trim();
       if (message === "/history sync") {
         const result = await options.historyMap.sync();
@@ -103,4 +113,8 @@ function formatEntry(entry: HistoryMapEntry): string {
 function clipForFeishu(value: string | undefined, maximum: number): string {
   if (!value) return "无";
   return value.length <= maximum ? value : `${value.slice(0, maximum - 1)}…`;
+}
+
+function identifierFingerprint(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 12);
 }

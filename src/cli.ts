@@ -104,7 +104,7 @@ codex.command("run")
     const roots = [...allowedRoot, ...splitEnvironmentList(process.env.CODEX_AGENT_ALLOWED_ROOTS)];
     const openIds = [...allowOpenId, ...splitEnvironmentList(process.env.CODEX_AGENT_ALLOWED_OPEN_IDS)];
     const client = new CodexAppServerClient();
-    const agent = createCodingAgent({ client, historyMap: new CodexHistoryMap(client, historyMap), allowedRoots: roots, allowedOpenIds: openIds });
+    const agent = createCodingAgent({ client, historyMap: new CodexHistoryMap(client, historyMap), allowedRoots: roots, allowedOpenIds: openIds, logger: console });
     await startBot({
       appId,
       appSecret,

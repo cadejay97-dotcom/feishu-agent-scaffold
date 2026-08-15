@@ -1,4 +1,5 @@
 import { createLarkChannel, type LarkChannel, type NormalizedMessage, type RawMessageEvent } from "@larksuiteoapi/node-sdk";
+import { createHash } from "node:crypto";
 import type { Agent } from "../types.js";
 import type { AgentManifest } from "../agent-loader.js";
 
@@ -35,7 +36,8 @@ export async function startBot(options: BotOptions): Promise<LarkChannel> {
       chatType: message.chatType,
       mentionedBot: message.mentionedBot,
       eligible,
-      senderIdSource: senderOpenId === message.senderId ? "normalized" : "raw-open-id"
+      senderIdSource: senderOpenId === message.senderId ? "normalized" : "raw-open-id",
+      senderIdFingerprint: identifierFingerprint(senderOpenId)
     });
     if (!eligible) return;
     try {
@@ -67,4 +69,8 @@ function shouldHandle(message: NormalizedMessage, manifest: AgentManifest): bool
 export function resolveSenderOpenId(message: NormalizedMessage): string {
   const raw = message.raw as RawMessageEvent | undefined;
   return raw?.sender?.sender_id?.open_id || message.senderId;
+}
+
+function identifierFingerprint(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 12);
 }
