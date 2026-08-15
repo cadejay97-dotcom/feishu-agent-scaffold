@@ -3,6 +3,9 @@ import "dotenv/config";
 import { spawn } from "node:child_process";
 import { Command } from "commander";
 import { loadAgent } from "./agent-loader.js";
+import { createCodingAgent } from "./codex/agent.js";
+import { CodexAppServerClient } from "./codex/app-server.js";
+import { CodexHistoryMap, defaultHistoryMapPath, displayHistoryMapEntry } from "./codex/history-map.js";
 import { startBot } from "./lark/bot.js";
 import { generateLangBotArtifacts, loadLangBotIntegration } from "./integrations/langbot.js";
 import { readModelFile } from "./model/config.js";
@@ -77,6 +80,80 @@ langbot.command("generate")
     }, null, 2));
   });
 
+const codex = program.command("codex").description("Connect an explicitly authorized local Codex Coding Agent to Feishu");
+
+codex.command("run")
+  .description("Run the Feishu Coding Agent backed by local codex app-server")
+  .option("--allowed-root <path>", "local workspace root the bot may use (repeatable)", collectOption, [])
+  .option("--allow-open-id <id>", "Feishu open_id authorized to access local history (repeatable)", collectOption, [])
+  .option("--history-map <path>", "local history map path", process.env.CODEX_HISTORY_MAP || defaultHistoryMapPath())
+  .action(async ({ allowedRoot, allowOpenId, historyMap }) => {
+    const appId = requiredEnv("FEISHU_APP_ID");
+    const appSecret = requiredEnv("FEISHU_APP_SECRET");
+    const roots = [...allowedRoot, ...splitEnvironmentList(process.env.CODEX_AGENT_ALLOWED_ROOTS)];
+    const openIds = [...allowOpenId, ...splitEnvironmentList(process.env.CODEX_AGENT_ALLOWED_OPEN_IDS)];
+    const client = new CodexAppServerClient();
+    const agent = createCodingAgent({ client, historyMap: new CodexHistoryMap(client, historyMap), allowedRoots: roots, allowedOpenIds: openIds });
+    await startBot({
+      appId,
+      appSecret,
+      agent,
+      manifest: {
+        schemaVersion: 1,
+        name: "Local Codex",
+        description: "An explicitly authorized local Coding Agent.",
+        entry: "built-in:codex",
+        triggers: ["mention", "direct-message"]
+      },
+      logger: console
+    });
+  });
+
+const codexMap = codex.command("map").description("Build and query the local Codex conversation map");
+
+codexMap.command("sync")
+  .description("Incrementally index local Codex conversations")
+  .option("--history-map <path>", "local history map path", process.env.CODEX_HISTORY_MAP || defaultHistoryMapPath())
+  .option("--limit <count>", "maximum number of conversations to examine", parsePositiveInteger)
+  .action(async ({ historyMap, limit }) => {
+    const client = new CodexAppServerClient();
+    try {
+      console.log(JSON.stringify(await new CodexHistoryMap(client, historyMap).sync(limit), null, 2));
+    } finally {
+      await client.close();
+    }
+  });
+
+codexMap.command("search")
+  .description("Search the locally indexed conversation map")
+  .argument("<query>", "keywords")
+  .option("--history-map <path>", "local history map path", process.env.CODEX_HISTORY_MAP || defaultHistoryMapPath())
+  .option("--limit <count>", "maximum results", parsePositiveInteger, 10)
+  .action(async (query, { historyMap, limit }) => {
+    const client = new CodexAppServerClient();
+    try {
+      const entries = await new CodexHistoryMap(client, historyMap).search(query, limit);
+      console.log(JSON.stringify(entries.map(displayHistoryMapEntry), null, 2));
+    } finally {
+      await client.close();
+    }
+  });
+
+codexMap.command("show")
+  .description("Show one mapped conversation and its recovery metadata")
+  .argument("<thread-id>", "Codex thread ID")
+  .option("--history-map <path>", "local history map path", process.env.CODEX_HISTORY_MAP || defaultHistoryMapPath())
+  .action(async (threadId, { historyMap }) => {
+    const client = new CodexAppServerClient();
+    try {
+      const entry = await new CodexHistoryMap(client, historyMap).get(threadId);
+      if (!entry) throw new Error("Conversation is not in the local map. Run codex map sync first.");
+      console.log(JSON.stringify(displayHistoryMapEntry(entry), null, 2));
+    } finally {
+      await client.close();
+    }
+  });
+
 function requiredEnv(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`Missing required environment variable: ${name}`);
@@ -89,6 +166,20 @@ function runLarkCli(args: string[]): Promise<void> {
     child.on("error", reject);
     child.on("exit", (code) => code === 0 ? resolve() : reject(new Error(`lark-cli ${args.join(" ")} exited with ${code}`)));
   });
+}
+
+function collectOption(value: string, previous: string[]): string[] {
+  return [...previous, value];
+}
+
+function splitEnvironmentList(value: string | undefined): string[] {
+  return value ? value.split(/[,:\n]/).map((item) => item.trim()).filter(Boolean) : [];
+}
+
+function parsePositiveInteger(value: string): number {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) throw new Error("Expected a positive integer");
+  return parsed;
 }
 
 program.parseAsync().catch((error) => {

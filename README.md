@@ -13,6 +13,57 @@
 - Anthropic Messages 适配器：Claude 系列。
 - Docker Compose 部署，以及 Agent 合约验证命令。
 
+## 两种 Agent 模式
+
+| 模式 | 入口 | 能做什么 | 不能做什么 | 权限边界 |
+| --- | --- | --- | --- | --- |
+| 最小 Agent 框架 + 自定义 Agent | `feishu-agent run --agent-dir ...`，或 LangBot 声明式部署 | 按 Agent 文件夹的 `createAgent()` 或已确定的 LangBot 提示词处理飞书消息 | 不会把普通 Agent 变成 Coding Agent，不会猜测工具、目录、提示词或权限 | Agent 提供方显式声明模型、依赖、凭据和权限 |
+| 本地 Coding Agent | `feishu-agent codex run` | 搜索/查看/恢复本机 Codex 对话，并在批准的本地目录继续开发 | 不会访问未白名单目录，不会向未授权飞书用户暴露历史，不会自动批准 Codex 的操作 | 飞书 `open_id` 白名单 + 本机目录白名单 + 现有 Codex 审批/沙箱策略 |
+
+这两种模式不能混淆。前者的最小合约在本 README 的“Agent 文件夹契约”；后者是机器管理员显式接入的本机开发能力，**不接受**任意上传的 Agent 文件夹或 GitHub 仓库来获得本机文件访问权。
+
+## 本地 Codex Coding Agent 与历史地图
+
+本机 Codex 的正确接入点是 `codex app-server --stdio`。脚手架通过它的 `thread/list`、`thread/read`、`thread/resume` 和 `turn/start` 调用历史与开发能力，不会把完整历史对话复制进普通模型提示词。
+
+先构建历史地图。地图保存在本机 `CODEX_HOME/history-map.json`（默认 `~/.codex/history-map.json`），权限为仅当前用户可读写；它保存脱敏后的摘要、回合、文件变更、工具轨迹、fork/父子关系、主题和“记忆建议”，原始会话仍由 Codex 本地历史保存。地图是增量更新的，不会改变任何 Codex 会话的记忆设置。
+
+```bash
+# 首次执行会索引所有本地、含已归档的交互式会话；可先用 --limit 验证。
+npx tsx src/cli.ts codex map sync
+npx tsx src/cli.ts codex map search "飞书 agent"
+npx tsx src/cli.ts codex map show 019ffb0a-849c-7240-a08f-ca975fe171c6
+```
+
+记忆标记含义：
+
+- `required`：会话含文件变更、工具调用、分支关系或长开发上下文；继续开发前必须恢复该原线程。
+- `checkpoint`：历史仍可恢复，地图持续记录变化；只在需要背景时恢复。
+- `none`：没有可读的持久回合或会话是临时的；地图保留元数据并说明无法恢复的原因。
+
+指定验收会话 `019ffb0a-849c-7240-a08f-ca975fe171c6` 会在 App Server 中以其本机标题、工作目录和 29 个可恢复回合出现。它是本功能的首个回归样本，而不是被复制到仓库的测试数据。
+
+启动飞书 Coding Agent 前，机器管理员必须写出允许访问本机历史的飞书用户 `open_id`，以及允许开发的工作目录。不要用群成员列表、Bot 名称或 email 代替 `open_id`。
+
+```bash
+FEISHU_APP_ID=... FEISHU_APP_SECRET=... \
+  npx tsx src/cli.ts codex run \
+  --allow-open-id ou_authorized_user \
+  --allowed-root /absolute/path/to/workspace
+```
+
+在飞书中 @Bot 后可使用：
+
+```text
+/history sync
+/history search <关键词>
+/history show <thread-id>
+/codex resume <thread-id> <开发任务>
+/codex new <工作目录编号> <开发任务>
+```
+
+`resume` 只会继续其 `cwd` 位于白名单内的既有线程，`new` 只能选择命令列出的编号目录。若原线程正被另一个 Codex 客户端写入，脚手架会从该线程创建一个新 fork 并明确回复新 ID，不会争抢原线程的写锁。脚手架保留本机 Codex 的审批和沙箱设置，绝不自动批准命令、文件写入或外部访问。若 Codex 请求人工审批，需在本机 Codex 客户端处理后再继续；这不是飞书 Bot 可以安全绕过的步骤。
+
 ## LangBot 原生接入
 
 `langbot` 子命令仅接入 LangBot 当前的 **Lark Bot + Pipeline + local-agent runner**。它把 Agent 已确定的系统提示、模型 UUID 和运行限制生成 LangBot 可执行部署产物，不执行或改写 Agent 的 `index.mjs`，也不配置 LangBot 的 RAG、知识库、插件、MCP、工作流、管理台或其他渠道。
@@ -25,6 +76,8 @@ npx tsx src/cli.ts langbot generate --agent-dir examples/echo-agent --out ./gene
 详细的文件契约、真实 API 依据、部署命令和 `@Bot` 生产验证命令见 [docs/langbot.md](docs/langbot.md)。
 
 `models.yaml` 只包含模型别名、端点和 API Key 环境变量名。真正的 Key 永远放在部署环境中。
+
+LangBot 是本项目优先支持的 IM Agent 宿主之一：它覆盖多 IM、Pipeline、插件、MCP、RAG 与 AgentRunner Protocol v1。但开源生态没有可证明的“绝对最广泛”单一框架，本仓库不会作此声明。对于已确定职责的自定义 Agent，现有 `local-agent` 部署已足够；对于完整 Coding Agent，应使用 LangBot 的**进程外 AgentRunner**把受限的 Codex App Server 桥接进去。该桥接必须继承本文的 `open_id`、目录、审批、超时和密钥隔离边界，不能把 Codex 本机权限交给普通 LangBot Pipeline。
 
 ## 快速开始
 
@@ -108,6 +161,12 @@ my-agent/
 
 参见可运行示例：[examples/echo-agent](examples/echo-agent)。
 
+### GitHub 仓库交付条件
+
+GitHub 仓库不是另一种运行时协议。部署方必须先将仓库固定到可审查的 commit/tag，检出后选择一个子目录作为 `--agent-dir`，该目录仍必须满足同一份最小契约。不要把整个 monorepo、未锁定的默认分支或含环境凭据的目录直接作为 Agent 输入。
+
+仓库交付必须额外提供：精确 commit/tag、Agent 子目录、Node/运行时版本与锁文件、安装命令、外部依赖清单、网络出口与数据处理说明。脚手架不会 `npm install`、执行安装脚本、克隆私有仓库或根据 README 猜测入口；这些工作必须由部署责任人先在隔离环境完成并验证。
+
 ## 不接收的 Agent 文件夹
 
 以下任一情况都不能通过本脚手架建 Bot，必须先由 Agent 提供方修复：
@@ -153,10 +212,12 @@ claude:
 3. Agent 的职责边界、可处理/不可处理的任务、群聊与私聊触发方式是什么？这些应已经写在 Agent 内，而非由脚手架补全。
 4. 使用哪个模型别名、供应商、地区端点、模型版本、Key 注入方式和故障回退策略？供应商的数据保留/合规要求是否已确认？
 5. Agent 依赖哪些外部系统、工具、数据库、网络出口和凭据？这些依赖是否在部署环境可用并已最小授权？
-6. 飞书需要哪些精确权限和事件订阅？是否已确认管理员可批准，且不会要求超出业务范围的用户数据访问？
-7. 运行在哪里（本机、Docker、服务器、Kubernetes）？App Secret 与模型 Key 如何存储、轮换、审计？
-8. 如何观测失败、限流、模型成本与用户投诉？谁负责停止 Bot、回滚版本和撤销权限？
-9. GitHub 仓库的 owner、可见性、默认分支和协作者权限是否确认？仓库中不得出现任何真实密钥或用户数据。
+6. 若输入来自 GitHub：固定 commit/tag、Agent 子目录、锁文件、安装命令和依赖清单分别是什么？是否已在隔离环境验证，而不是运行时临时安装？
+7. 飞书需要哪些精确权限和事件订阅？是否已确认管理员可批准，且不会要求超出业务范围的用户数据访问？
+8. 运行在哪里（本机、Docker、服务器、Kubernetes）？App Secret 与模型 Key 如何存储、轮换、审计？
+9. 若启用本地 Coding Agent：已授权的飞书 `open_id`、允许工作目录、Codex 审批/沙箱策略、历史地图位置与数据留存责任人分别是谁？
+10. 如何观测失败、限流、模型成本与用户投诉？谁负责停止 Bot、回滚版本和撤销权限？
+11. GitHub 仓库的 owner、可见性、默认分支和协作者权限是否确认？仓库中不得出现任何真实密钥或用户数据。
 
 任一项未解决时，停止创建/发布 Bot，记录缺失项后交还给项目负责人。这个停止条件是设计要求，不是脚手架可自动弥补的缺陷。
 
