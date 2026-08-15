@@ -25,11 +25,13 @@ export function createCodingAgent(options: CodingAgentOptions): Agent {
         return { text: `历史地图已同步：新增或更新 ${result.indexed}，未变化 ${result.unchanged}，共 ${result.total} 个会话。` };
       }
       if (message.startsWith("/history search ")) {
+        await options.historyMap.sync();
         const results = await options.historyMap.search(message.slice("/history search ".length));
         return { text: formatSearch(results) };
       }
       if (message.startsWith("/history show ")) {
         const threadId = message.slice("/history show ".length).trim();
+        await options.historyMap.sync();
         const entry = await options.historyMap.get(threadId);
         return { text: entry ? formatEntry(entry) : "地图中没有该会话。请先执行 /history sync。" };
       }
@@ -51,7 +53,7 @@ export function createCodingAgent(options: CodingAgentOptions): Agent {
         await options.historyMap.sync();
         return { text: `${result.text}\n\n新会话：${thread.id}` };
       }
-      return { text: `Coding Agent 命令：\n/history sync\n/history search <关键词>\n/history show <thread-id>\n/codex resume <thread-id> <开发任务>\n/codex new <工作目录编号> <开发任务>\n允许的工作目录：${allowedRoots.map((root, index) => `${index + 1}. ${root}`).join("；")}` };
+      return { text: `Coding Agent 命令：\n/history sync\n/history search <关键词>（自动增量同步）\n/history show <thread-id>（含回合摘录）\n/codex resume <thread-id> <开发任务>\n/codex new <工作目录编号> <开发任务>\n允许的工作目录：${allowedRoots.map((root, index) => `${index + 1}. ${root}`).join("；")}` };
     }
   };
 }
@@ -78,6 +80,12 @@ function formatSearch(entries: HistoryMapEntry[]): string {
 }
 
 function formatEntry(entry: HistoryMapEntry): string {
+  const excerpts = entry.turns
+    .map((turn, index) => ({ turn, index }))
+    .filter(({ turn }) => turn.excerpt)
+    .slice(-3)
+    .map(({ turn, index }) => `回合摘录 ${index + 1}/${entry.turns.length}：${clipForFeishu(turn.excerpt!, 700)}`)
+    .join("\n\n");
   return [
     `${entry.name ?? "未命名会话"}`,
     `会话：${entry.id}`,
@@ -87,6 +95,12 @@ function formatEntry(entry: HistoryMapEntry): string {
     `原因：${entry.memory.reason}`,
     `文件：${entry.files.slice(0, 12).join(", ") || "无"}`,
     `主题：${entry.topics.join(", ") || "无"}`,
-    `摘要：${entry.preview}`
+    `摘要：${clipForFeishu(entry.preview, 900)}`,
+    excerpts || "回合摘录：无"
   ].join("\n");
+}
+
+function clipForFeishu(value: string | undefined, maximum: number): string {
+  if (!value) return "无";
+  return value.length <= maximum ? value : `${value.slice(0, maximum - 1)}…`;
 }

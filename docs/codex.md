@@ -17,6 +17,8 @@
 
 为避免复制敏感数据，地图会脱敏常见 API Key、App Secret 与 Authorization/Bearer 值，并限制每个会话的索引文本大小。它仍可能包含对话的业务信息，因此必须保留在本机受限目录，不能提交 Git，也不能上传给 LangBot、模型供应商或飞书。
 
+飞书的 `/history search <关键词>` 与 `/history show <thread-id>` 每次都会先做一次增量同步；`show` 除恢复元数据外还包含最近三个有内容回合的脱敏摘录。飞书只承载这个受限投影，完整上下文继续由本地 Codex 历史提供，并在 `/codex resume` 时恢复到原线程或其安全 fork。
+
 ## LangBot 选择和限制
 
 LangBot 的 AgentRunner Protocol v1 允许进程外运行器以 run-scoped Host API/MCP bridge 获取被授权的历史、工具和资产。其官方 `langbot-local-agent` 是 LangBot 托管模型的本地 runner，不代表它能任意访问用户电脑。

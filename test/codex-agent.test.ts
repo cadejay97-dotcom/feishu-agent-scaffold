@@ -21,6 +21,27 @@ test("rejects unauthorized Feishu users before exposing local history", async ()
   assert.equal(client.calls, 0);
 });
 
+test("refreshes the local map before showing or searching a Codex conversation", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "codex-agent-query-map-"));
+  try {
+    const client = new FakeClient("/allowed/project");
+    const agent = createCodingAgent({
+      client,
+      historyMap: new CodexHistoryMap(client, path.join(directory, "map.json")),
+      allowedRoots: ["/allowed"],
+      allowedOpenIds: ["ou_allowed"]
+    });
+    const search = await agent.handle(input("ou_allowed", "/history search test"));
+    const detail = await agent.handle(input("ou_allowed", "/history show thread-1"));
+
+    assert.match(search.text, /thread-1/);
+    assert.match(detail.text, /回合摘录/);
+    assert.ok(client.calls >= 4, "both queries should synchronize through the Codex client");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("resumes an allowed thread and refuses a thread outside the workspace boundary", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "codex-agent-map-"));
   try {
@@ -74,7 +95,14 @@ class FakeClient implements CodexRpcClient {
   constructor(cwd: string) { this.cwd = cwd; }
 
   private thread(): CodexThread {
-    return { id: "thread-1", cwd: this.cwd, name: "test", preview: "test", updatedAt: 1, turns: [{ id: "turn-1", items: [] }] };
+    return {
+      id: "thread-1",
+      cwd: this.cwd,
+      name: "test",
+      preview: "test",
+      updatedAt: 1,
+      turns: [{ id: "turn-1", items: [{ type: "agentMessage", id: "agent-1", text: "thread context" }] }]
+    };
   }
 
   async listThreads(params: Record<string, unknown> = {}): Promise<{ data: CodexThread[]; nextCursor: string | null }> {
