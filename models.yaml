@@ -1,0 +1,33 @@
+# Provider keys always come from environment variables, never from this file.
+defaultModel: deepseek-chat
+models:
+  openai:
+    provider: openai-compatible
+    model: gpt-4.1-mini
+    baseUrl: https://api.openai.com/v1
+    apiKeyEnv: OPENAI_API_KEY
+  deepseek-chat:
+    provider: openai-compatible
+    model: deepseek-chat
+    baseUrl: https://api.deepseek.com/v1
+    apiKeyEnv: DEEPSEEK_API_KEY
+  kimi-k3:
+    provider: openai-compatible
+    model: kimi-k3
+    baseUrl: https://api.moonshot.cn/v1
+    apiKeyEnv: MOONSHOT_API_KEY
+  glm:
+    provider: openai-compatible
+    model: glm-4.7
+    baseUrl: https://open.bigmodel.cn/api/paas/v4
+    apiKeyEnv: ZHIPU_API_KEY
+  mimo:
+    provider: openai-compatible
+    model: mimo-v2-flash
+    baseUrl: https://api.xiaomimimo.com/v1
+    apiKeyEnv: MIMO_API_KEY
+  claude:
+    provider: anthropic
+    model: claude-sonnet-4-6
+    baseUrl: https://api.anthropic.com
+    apiKeyEnv: ANTHROPIC_API_KEY

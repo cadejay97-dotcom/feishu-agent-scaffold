@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "name": "Echo Agent",
+  "description": "A minimal Feishu Agent contract example.",
+  "entry": "index.mjs",
+  "triggers": ["mention", "direct-message"],
+  "defaultModel": "deepseek-chat"
+}

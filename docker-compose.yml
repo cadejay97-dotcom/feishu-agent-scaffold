@@ -1,0 +1,10 @@
+services:
+  feishu-agent:
+    build: .
+    env_file: .env
+    environment:
+      AGENT_DIR: /agents
+    volumes:
+      - ${AGENT_DIR:?Set AGENT_DIR in .env}:/agents:ro
+      - ./models.yaml:/app/models.yaml:ro
+    restart: unless-stopped

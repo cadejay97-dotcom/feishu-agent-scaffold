@@ -1,0 +1,32 @@
+{
+  "name": "feishu-agent-scaffold",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bring pre-adapted local agents to Feishu bots.",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "bin": {
+    "feishu-agent": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/cli.ts run",
+    "start": "node dist/cli.js run",
+    "test": "tsx --test test/**/*.test.ts",
+    "check": "npm run build && npm test"
+  },
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.73.0",
+    "commander": "^15.0.0",
+    "dotenv": "^17.4.2",
+    "yaml": "^2.8.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

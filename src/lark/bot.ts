@@ -1,0 +1,53 @@
+import { createLarkChannel, type LarkChannel, type NormalizedMessage } from "@larksuiteoapi/node-sdk";
+import type { Agent } from "../types.js";
+import type { AgentManifest } from "../agent-loader.js";
+
+export interface BotOptions {
+  appId: string;
+  appSecret: string;
+  agent: Agent;
+  manifest: AgentManifest;
+  logger?: Pick<Console, "debug" | "info" | "warn" | "error">;
+}
+
+export async function startBot(options: BotOptions): Promise<LarkChannel> {
+  const logger = options.logger ?? console;
+  const channel = createLarkChannel({
+    appId: options.appId,
+    appSecret: options.appSecret,
+    transport: "websocket",
+    source: "feishu-agent-scaffold",
+    policy: {
+      requireMention: false,
+      dmMode: options.manifest.triggers.includes("direct-message") ? "open" : "disabled"
+    },
+    safety: { chatQueue: { enabled: true } },
+    outbound: { textChunkLimit: 4000 }
+  });
+
+  channel.on("message", async (message) => {
+    if (!shouldHandle(message, options.manifest)) return;
+    try {
+      const result = await options.agent.handle({
+        text: message.content.trim(),
+        chatId: message.chatId,
+        messageId: message.messageId,
+        senderOpenId: message.senderId,
+        mentionsBot: message.mentionedBot
+      });
+      if (result.text.trim()) await channel.send(message.chatId, { text: result.text.trim() }, { replyTo: message.messageId });
+    } catch (error) {
+      logger.error("Agent message handling failed", error);
+      await channel.send(message.chatId, { text: "处理这条消息时发生了错误，请稍后重试。" }, { replyTo: message.messageId });
+    }
+  });
+  channel.on("error", (error) => logger.error("Feishu channel error", error));
+  await channel.connect();
+  logger.info(`Feishu bot connected for Agent: ${options.manifest.name}`);
+  return channel;
+}
+
+function shouldHandle(message: NormalizedMessage, manifest: AgentManifest): boolean {
+  if (message.chatType === "group") return manifest.triggers.includes("mention") && message.mentionedBot;
+  return manifest.triggers.includes("direct-message");
+}
