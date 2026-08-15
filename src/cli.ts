@@ -3,6 +3,7 @@ import "dotenv/config";
 import { spawn } from "node:child_process";
 import { Command } from "commander";
 import { loadAgent } from "./agent-loader.js";
+import { fetchGitHubAgentSource } from "./agent-source.js";
 import { createCodingAgent } from "./codex/agent.js";
 import { CodexAppServerClient } from "./codex/app-server.js";
 import { CodexHistoryMap, defaultHistoryMapPath, displayHistoryMapEntry } from "./codex/history-map.js";
@@ -46,6 +47,16 @@ program.command("validate-agent")
     const llm = new ModelRegistry(await readModelFile(models));
     const { manifest } = await loadAgent(agentDir, { llm, logger: console, agentRoot: "" });
     console.log(JSON.stringify({ valid: true, name: manifest.name, triggers: manifest.triggers, defaultModel: manifest.defaultModel ?? null }, null, 2));
+  });
+
+program.command("fetch-agent")
+  .description("Fetch a pinned GitHub Agent repository without installing or executing it")
+  .requiredOption("--repo <https-url>", "HTTPS github.com owner/repository URL")
+  .requiredOption("--ref <git-ref>", "required branch, tag, or commit-like ref")
+  .requiredOption("--out <path>", "new destination directory; existing paths are refused")
+  .option("--agent-subdir <path>", "Agent directory inside the repository", ".")
+  .action(async ({ repo, ref, out, agentSubdir }) => {
+    console.log(JSON.stringify(await fetchGitHubAgentSource({ repo, ref, out, agentSubdir }), null, 2));
   });
 
 const langbot = program.command("langbot").description("Generate LangBot Lark + local-agent deployment artifacts");

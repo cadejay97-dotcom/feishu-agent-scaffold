@@ -163,7 +163,18 @@ my-agent/
 
 ### GitHub 仓库交付条件
 
-GitHub 仓库不是另一种运行时协议。部署方必须先将仓库固定到可审查的 commit/tag，检出后选择一个子目录作为 `--agent-dir`，该目录仍必须满足同一份最小契约。不要把整个 monorepo、未锁定的默认分支或含环境凭据的目录直接作为 Agent 输入。
+GitHub 仓库不是另一种运行时协议。先用脚手架将一个**明确 ref** 检出到新目录，再选择一个子目录作为 `--agent-dir`；该目录仍必须满足同一份最小契约。不要把整个 monorepo、未锁定的默认分支或含环境凭据的目录直接作为 Agent 输入。
+
+```bash
+npx tsx src/cli.ts fetch-agent \
+  --repo https://github.com/example/my-agent \
+  --ref v1.2.3 \
+  --out ./agents/my-agent-v1.2.3 \
+  --agent-subdir agent
+npx tsx src/cli.ts validate-agent --agent-dir ./agents/my-agent-v1.2.3/agent
+```
+
+`fetch-agent` 只接受无凭据的 HTTPS `github.com/owner/repository` URL，拒绝覆盖已有目录，禁用 Git hooks，并且不会安装依赖、运行安装脚本或执行仓库代码。`validate-agent` 会导入 Agent 入口来验证合约，因而只能在人工审查并满足依赖隔离条件后运行。
 
 仓库交付必须额外提供：精确 commit/tag、Agent 子目录、Node/运行时版本与锁文件、安装命令、外部依赖清单、网络出口与数据处理说明。脚手架不会 `npm install`、执行安装脚本、克隆私有仓库或根据 README 猜测入口；这些工作必须由部署责任人先在隔离环境完成并验证。
 
