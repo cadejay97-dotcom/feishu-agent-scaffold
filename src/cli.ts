@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import { Command } from "commander";
 import { loadAgent } from "./agent-loader.js";
 import { startBot } from "./lark/bot.js";
+import { generateLangBotArtifacts, loadLangBotIntegration } from "./integrations/langbot.js";
 import { readModelFile } from "./model/config.js";
 import { ModelRegistry } from "./model/registry.js";
 
@@ -42,6 +43,38 @@ program.command("validate-agent")
     const llm = new ModelRegistry(await readModelFile(models));
     const { manifest } = await loadAgent(agentDir, { llm, logger: console, agentRoot: "" });
     console.log(JSON.stringify({ valid: true, name: manifest.name, triggers: manifest.triggers, defaultModel: manifest.defaultModel ?? null }, null, 2));
+  });
+
+const langbot = program.command("langbot").description("Generate LangBot Lark + local-agent deployment artifacts");
+
+langbot.command("validate")
+  .description("Validate a LangBot-native declarative Agent configuration")
+  .requiredOption("--agent-dir <path>", "Agent directory containing langbot.agent.json")
+  .action(async ({ agentDir }) => {
+    const integration = await loadLangBotIntegration(agentDir);
+    console.log(JSON.stringify({
+      valid: true,
+      agent: integration.manifest.name,
+      pipeline: integration.pipelineName,
+      modelUuid: integration.config.modelUuid,
+      botName: integration.config.bot.botName
+    }, null, 2));
+  });
+
+langbot.command("generate")
+  .description("Generate a reviewable LangBot deployment directory without contacting LangBot or Feishu")
+  .requiredOption("--agent-dir <path>", "Agent directory containing langbot.agent.json")
+  .requiredOption("--out <path>", "output directory for LangBot artifacts")
+  .action(async ({ agentDir, out }) => {
+    const integration = await loadLangBotIntegration(agentDir);
+    await generateLangBotArtifacts(agentDir, out);
+    console.log(JSON.stringify({
+      generated: true,
+      out,
+      agent: integration.manifest.name,
+      pipeline: integration.pipelineName,
+      next: "Review the generated files, then run node deploy.mjs with LANGBOT_API_URL, LANGBOT_API_KEY, FEISHU_APP_ID, and FEISHU_APP_SECRET."
+    }, null, 2));
   });
 
 function requiredEnv(name: string): string {

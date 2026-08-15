@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "modelUuid": "replace-with-a-langbot-model-uuid",
+  "fallbackModelUuids": [],
+  "systemPrompt": "你是一个简洁、准确的飞书工作助手。直接回答用户问题；不需要解释你的内部实现。",
+  "timeoutSeconds": 300,
+  "maxRounds": 10,
+  "removeThink": false,
+  "bot": {
+    "botName": "Echo Agent",
+    "domain": "https://open.feishu.cn",
+    "streamReply": true
+  },
+  "pipeline": {
+    "name": "Echo Agent Pipeline",
+    "description": "Echo Agent 的 LangBot 本地 Agent Pipeline。"
+  }
+}

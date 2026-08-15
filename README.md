@@ -13,6 +13,17 @@
 - Anthropic Messages 适配器：Claude 系列。
 - Docker Compose 部署，以及 Agent 合约验证命令。
 
+## LangBot 原生接入
+
+`langbot` 子命令仅接入 LangBot 当前的 **Lark Bot + Pipeline + local-agent runner**。它把 Agent 已确定的系统提示、模型 UUID 和运行限制生成 LangBot 可执行部署产物，不执行或改写 Agent 的 `index.mjs`，也不配置 LangBot 的 RAG、知识库、插件、MCP、工作流、管理台或其他渠道。
+
+```bash
+npx tsx src/cli.ts langbot validate --agent-dir examples/echo-agent
+npx tsx src/cli.ts langbot generate --agent-dir examples/echo-agent --out ./generated/langbot-echo
+```
+
+详细的文件契约、真实 API 依据、部署命令和 `@Bot` 生产验证命令见 [docs/langbot.md](docs/langbot.md)。
+
 `models.yaml` 只包含模型别名、端点和 API Key 环境变量名。真正的 Key 永远放在部署环境中。
 
 ## 快速开始
