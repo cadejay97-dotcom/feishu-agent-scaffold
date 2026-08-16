@@ -13,6 +13,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsx src/cli.ts run",
+    "control": "tsx src/cli.ts control",
     "start": "node dist/cli.js run",
     "test": "tsx --test test/**/*.test.ts",
     "check": "npm run build && npm test"

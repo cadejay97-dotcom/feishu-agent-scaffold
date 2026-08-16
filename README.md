@@ -81,6 +81,28 @@ npx tsx src/cli.ts langbot generate --agent-dir examples/echo-agent --out ./gene
 
 LangBot 是本项目优先支持的 IM Agent 宿主之一：它覆盖多 IM、Pipeline、插件、MCP、RAG 与 AgentRunner Protocol v1。但开源生态没有可证明的“绝对最广泛”单一框架，本仓库不会作此声明。对于已确定职责的自定义 Agent，现有 `local-agent` 部署已足够；对于完整 Coding Agent，应使用 LangBot 的**进程外 AgentRunner**把受限的 Codex App Server 桥接进去。该桥接必须继承本文的 `union_id`/同应用 `open_id`、目录、审批、超时和密钥隔离边界，不能把 Codex 本机权限交给普通 LangBot Pipeline。
 
+## 本地 Profile 控制台
+
+控制台是只监听 `127.0.0.1` 的本地 Web UI，用于查看和维护两类后台 Profile：
+
+- **Agent Profiles**：将一个 LangBot/Codex runtime 与 `lark-cli` application profile、Agent 源目录、部署产物目录绑定。LangBot Profile 可以依次执行预检、生成可审查产物、部署同步。
+- **User Profiles**：从本机 `lark-cli` 配置读取已授权用户的显示名、所属 CLI Profile 和 token 状态。页面不会返回 App Secret、token、原始 `open_id`/`union_id` 或完整 App ID。
+
+```bash
+npm run control
+# 默认打开 http://127.0.0.1:4318
+```
+
+首次启动会在 `~/.feishu-agent-scaffold/profiles.json` 使用默认的 `langbot-codex` Agent Profile；它只保存公开部署元数据。也可指定另一个本地 registry：
+
+```bash
+npx tsx src/cli.ts control --port 4318 --registry /absolute/path/to/profiles.json
+```
+
+控制台动作的边界是明确的：`Preflight` 只校验本地 Agent 契约；`Generate` 只重建 LangBot 请求产物，不发网络请求；`Sync` 才会执行已存在的 `deploy.mjs`，并要求在界面输入 `SYNC <profile-id>`。同步要求部署目录已有未提交的本地 `.env`，其内容仅由子进程读取，绝不返回给浏览器或写入审计日志。每次操作会写入同一目录的 `sync-log.json`，最多保存 100 条脱敏记录。
+
+这不是飞书权限管理后台：创建/重新授权 `lark-cli` profile 仍使用受控的 CLI OAuth 流程；Bot 权限、应用发布和管理员审批仍在飞书开发者平台完成。
+
 ## 快速开始
 
 需要 Node.js 20+、`lark-cli`，并已为当前飞书租户完成 CLI 配置。

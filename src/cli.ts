@@ -8,6 +8,7 @@ import { createCodingAgent } from "./codex/agent.js";
 import { CodexAppServerClient } from "./codex/app-server.js";
 import { CodexHistoryMap, defaultHistoryMapPath, displayHistoryMapEntry } from "./codex/history-map.js";
 import { startBot } from "./lark/bot.js";
+import { startControlServer } from "./control/server.js";
 import { generateLangBotArtifacts, loadLangBotIntegration } from "./integrations/langbot.js";
 import { readModelFile } from "./model/config.js";
 import { ModelRegistry } from "./model/registry.js";
@@ -92,6 +93,15 @@ langbot.command("generate")
   });
 
 const codex = program.command("codex").description("Connect an explicitly authorized local Codex Coding Agent to Feishu");
+
+program.command("control")
+  .description("Start the local Feishu profile control console")
+  .option("--port <port>", "local HTTP port", parsePort, 4318)
+  .option("--registry <path>", "local profile registry path")
+  .action(async ({ port, registry }) => {
+    const server = await startControlServer({ port, registryFile: registry });
+    console.log(`Feishu Profile Control is running at ${server.url}`);
+  });
 
 codex.command("run")
   .description("Run the Feishu Coding Agent backed by local codex app-server")
@@ -192,6 +202,12 @@ function splitEnvironmentList(value: string | undefined): string[] {
 function parsePositiveInteger(value: string): number {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isSafeInteger(parsed) || parsed <= 0) throw new Error("Expected a positive integer");
+  return parsed;
+}
+
+function parsePort(value: string): number {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > 65535) throw new Error("Expected a valid TCP port");
   return parsed;
 }
 
