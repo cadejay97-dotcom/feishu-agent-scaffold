@@ -23,6 +23,23 @@ test("hosted UI access requires an exact HTTPS origin", async () => {
     const allowed = await fetch(`${server.url}/api/state`, { headers: { Origin: "https://profiles.example.com" } });
     assert.equal(allowed.status, 200);
     assert.equal(allowed.headers.get("access-control-allow-origin"), "https://profiles.example.com");
+    const state = await allowed.json() as { cliProfiles: unknown[] };
+    assert.deepEqual(state.cliProfiles, []);
+
+    const invalidBinding = await fetch(`${server.url}/api/agents/langbot-codex`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "LangBot Codex Agent",
+        cliProfile: "missing-profile",
+        runtime: "langbot",
+        sourceDir: directory,
+        artifactDir: directory,
+        deployDir: directory,
+        enabled: true
+      })
+    });
+    assert.equal(invalidBinding.status, 400);
 
     const blocked = await fetch(`${server.url}/api/state`, { headers: { Origin: "https://attacker.example.com" } });
     assert.equal(blocked.status, 403);

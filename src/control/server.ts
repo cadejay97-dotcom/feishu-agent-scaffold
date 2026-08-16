@@ -93,6 +93,7 @@ export class ProfileControl {
     return {
       generatedAt: new Date().toISOString(),
       registryFile: this.registryFile,
+      cliProfiles: cliProfiles.map(({ name, appIdSuffix, brand, classification }) => ({ name, appIdSuffix, brand, classification })),
       agents: await Promise.all(registry.agents.map(async (agent) => describeAgent(agent, cliByName.get(agent.cliProfile), runtime.get(agent.cliProfile)))),
       users: describeUsers(cliProfiles, runtime),
       audit: audit.slice(0, 12)
@@ -101,12 +102,16 @@ export class ProfileControl {
 
   async updateAgent(id: string, body: unknown): Promise<Record<string, unknown>> {
     const update = updateAgentSchema.parse(body);
-    const registry = await readRegistry(this.registryFile, this.projectRoot);
+    const [registry, cliProfiles] = await Promise.all([
+      readRegistry(this.registryFile, this.projectRoot),
+      readCliProfiles(this.cliConfigFile)
+    ]);
     const index = registry.agents.findIndex((agent) => agent.id === id);
     if (index < 0) throw new HttpError(404, "找不到 Agent Profile。");
+    if (!cliProfiles.some((profile) => profile.name === update.cliProfile)) throw new HttpError(400, "选择的 CLI Profile 不存在于本机 lark-cli 配置中。");
     registry.agents[index] = { id, ...update };
     await writeRegistry(this.registryFile, registry);
-    await this.appendAudit({ at: new Date().toISOString(), agentId: id, action: "preflight", status: "success", detail: "Profile configuration updated locally." });
+    await this.appendAudit({ at: new Date().toISOString(), agentId: id, action: "preflight", status: "success", detail: "Agent deployment binding updated in the local registry." });
     return this.state();
   }
 
