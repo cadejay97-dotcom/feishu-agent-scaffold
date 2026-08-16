@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { access, readFile, stat } from "node:fs/promises";
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { config as loadEnvironment } from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -73,6 +74,7 @@ export async function startControlServer(options: ControlServerOptions = {}): Pr
 
 export class ProfileControl {
   private readonly logFile: string;
+  private auditWrites: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly projectRoot: string,
@@ -151,9 +153,15 @@ export class ProfileControl {
   }
 
   private async appendAudit(entry: SyncLogEntry): Promise<void> {
+    const write = this.auditWrites.catch(() => undefined).then(() => this.writeAudit(entry));
+    this.auditWrites = write;
+    return write;
+  }
+
+  private async writeAudit(entry: SyncLogEntry): Promise<void> {
     const current = await this.readAudit();
     const next = [entry, ...current].slice(0, 100);
-    const temporary = `${this.logFile}.${process.pid}.tmp`;
+    const temporary = `${this.logFile}.${process.pid}.${randomUUID()}.tmp`;
     const { mkdir, rename, writeFile } = await import("node:fs/promises");
     await mkdir(path.dirname(this.logFile), { recursive: true, mode: 0o700 });
     await writeFile(temporary, `${JSON.stringify(next, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });

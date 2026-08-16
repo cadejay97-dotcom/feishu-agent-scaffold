@@ -1,4 +1,5 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import path from "node:path";
 import { z } from "zod";
@@ -71,7 +72,7 @@ export async function readRegistry(file: string, projectRoot: string): Promise<P
 export async function writeRegistry(file: string, value: ProfileRegistry): Promise<void> {
   const checked = registrySchema.parse(value);
   await mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
-  const temporary = `${file}.${process.pid}.tmp`;
+  const temporary = `${file}.${process.pid}.${randomUUID()}.tmp`;
   await writeFile(temporary, `${JSON.stringify(checked, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
   await rename(temporary, file);
 }
