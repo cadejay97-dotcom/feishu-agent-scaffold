@@ -41,6 +41,7 @@ export interface ControlServerOptions {
   registryFile?: string;
   cliConfigFile?: string;
   projectRoot?: string;
+  allowedOrigins?: string[];
 }
 
 export interface StartedControlServer {
@@ -52,7 +53,8 @@ export async function startControlServer(options: ControlServerOptions = {}): Pr
   const projectRoot = options.projectRoot || path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
   const registryFile = options.registryFile ? path.resolve(options.registryFile) : defaultRegistryFile();
   const control = new ProfileControl(projectRoot, registryFile, options.cliConfigFile);
-  const server = createServer((request, response) => void handleRequest(control, request, response));
+  const allowedOrigins = normalizeAllowedOrigins(options.allowedOrigins || []);
+  const server = createServer((request, response) => void handleRequest(control, request, response, allowedOrigins));
   const port = options.port ?? 4318;
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -61,8 +63,10 @@ export async function startControlServer(options: ControlServerOptions = {}): Pr
       resolve();
     });
   });
+  const address = server.address();
+  const actualPort = typeof address === "object" && address ? address.port : port;
   return {
-    url: `http://127.0.0.1:${port}`,
+    url: `http://127.0.0.1:${actualPort}`,
     close: () => new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()))
   };
 }
@@ -152,9 +156,25 @@ export class ProfileControl {
   }
 }
 
-async function handleRequest(control: ProfileControl, request: IncomingMessage, response: ServerResponse): Promise<void> {
+async function handleRequest(control: ProfileControl, request: IncomingMessage, response: ServerResponse, allowedOrigins: Set<string>): Promise<void> {
   const url = new URL(request.url || "/", "http://127.0.0.1");
   try {
+    const origin = request.headers.origin;
+    if (origin && isAllowedOrigin(origin, request.headers.host, allowedOrigins)) {
+      response.setHeader("Access-Control-Allow-Origin", origin);
+      response.setHeader("Vary", "Origin");
+    } else if (origin && url.pathname.startsWith("/api/")) {
+      throw new HttpError(403, "This UI origin is not allowed by the local control plane.");
+    }
+    if (request.method === "OPTIONS" && url.pathname.startsWith("/api/")) {
+      response.writeHead(204, {
+        "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Max-Age": "600"
+      });
+      response.end();
+      return;
+    }
     if (request.method === "GET" && url.pathname === "/") return sendHtml(response, appHtml);
     if (request.method === "GET" && url.pathname === "/api/state") return sendJson(response, 200, await control.state());
     const match = url.pathname.match(/^\/api\/agents\/([a-z0-9][a-z0-9-]{0,62})(?:\/(actions))?$/);
@@ -165,6 +185,21 @@ async function handleRequest(control: ProfileControl, request: IncomingMessage, 
     const status = error instanceof HttpError ? error.status : 500;
     sendJson(response, status, { ok: false, error: safeMessage(error) });
   }
+}
+
+export function normalizeAllowedOrigins(origins: string[]): Set<string> {
+  return new Set(origins.map((value) => {
+    const url = new URL(value);
+    if (url.protocol !== "https:" && url.hostname !== "127.0.0.1" && url.hostname !== "localhost") {
+      throw new Error(`Control UI origin must use HTTPS: ${url.origin}`);
+    }
+    return url.origin;
+  }));
+}
+
+function isAllowedOrigin(origin: string, host: string | undefined, allowedOrigins: Set<string>): boolean {
+  const sameOrigin = host ? origin === `http://${host}` || origin === `https://${host}` : false;
+  return sameOrigin || allowedOrigins.has(origin);
 }
 
 async function describeAgent(agent: AgentProfile, cli: CliProfile | undefined, runtime: CliRuntimeState | undefined): Promise<Record<string, unknown>> {

@@ -12,6 +12,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "vercel-build": "npm run build && node scripts/build-vercel.mjs",
     "dev": "tsx src/cli.ts run",
     "control": "tsx src/cli.ts control",
     "start": "node dist/cli.js run",

@@ -38,10 +38,11 @@ export const appHtml = String.raw`<!doctype html>
   <dialog id="sync-dialog"><div class="modal-head"><h3>Confirm deployment sync</h3></div><div class="modal-body"><p>This will call the configured local deployment script and may create or update LangBot resources.</p><label>Type <code id="confirm-text"></code><input id="confirmation" autocomplete="off"></label></div><div class="modal-actions"><button id="cancel-sync">Cancel</button><button class="danger" id="confirm-sync">Run sync</button></div></dialog><div id="toast"></div>
   <script>
     const app = { state:null, editing:null, pending:null };
+    const API_BASE = window.__FEISHU_API_BASE__ || '';
     const $ = (selector) => document.querySelector(selector);
     const esc = (value) => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
     const fmtTime = value => value ? new Intl.DateTimeFormat('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(value)) : '-';
-    async function request(url, options) { const response = await fetch(url, options); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Request failed'); return data; }
+    async function request(url, options) { const response = await fetch(API_BASE+url, options); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Request failed'); return data; }
     async function load() { try { const state = await request('/api/state'); app.state=state; render(); } catch(error) { toast(error.message, true); } }
     function readiness(agent) { const r=agent.readiness; return r.sourceReady && r.artifactsReady && r.deployReady && r.cliProfileReady; }
     function render() { const s=app.state; const ready=s.agents.filter(readiness).length; const auth=s.users.filter(u=>u.tokenStatus !== 'valid').length; $('#metric-agents').textContent=s.agents.length; $('#metric-ready').textContent=ready; $('#metric-users').textContent=s.users.length; $('#metric-auth').textContent=auth; $('#nav-agents').textContent=s.agents.length; $('#nav-users').textContent=s.users.length; $('#nav-audit').textContent=s.audit.length; $('#updated').textContent='LOCAL SNAPSHOT · '+fmtTime(s.generatedAt); $('#registry-path').textContent=s.registryFile.split('/').slice(-2).join('/');

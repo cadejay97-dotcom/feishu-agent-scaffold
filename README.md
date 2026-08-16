@@ -103,6 +103,26 @@ npx tsx src/cli.ts control --port 4318 --registry /absolute/path/to/profiles.jso
 
 这不是飞书权限管理后台：创建/重新授权 `lark-cli` profile 仍使用受控的 CLI OAuth 流程；Bot 权限、应用发布和管理员审批仍在飞书开发者平台完成。
 
+### Vercel 托管 UI
+
+生产 UI 发布在 [feishu-profile-control.vercel.app](https://feishu-profile-control.vercel.app)。Vercel 只托管静态 HTML；浏览器从当前电脑连接 `http://127.0.0.1:4318`，所以 Profile、用户身份、审计日志和部署凭据不会上传到 Vercel。
+
+使用托管 UI 前，在需要被控制的电脑启动 connector，并只允许生产域名：
+
+```bash
+npm run control -- \
+  --port 4318 \
+  --allow-origin https://feishu-profile-control.vercel.app
+```
+
+也可以通过环境变量持久配置，多个精确 Origin 用逗号分隔：
+
+```bash
+FEISHU_CONTROL_ALLOWED_ORIGINS=https://feishu-profile-control.vercel.app npm run control
+```
+
+非 HTTPS 的远端 Origin 会被拒绝；任意未列入白名单的页面访问 `/api/*` 会收到 `403`。生产 UI 已连接本仓库，推送 `main` 后 Vercel 自动执行 `npm run vercel-build`。该构建只把 `src/control/ui.ts` 编译为静态 `public/index.html`。
+
 ## 快速开始
 
 需要 Node.js 20+、`lark-cli`，并已为当前飞书租户完成 CLI 配置。

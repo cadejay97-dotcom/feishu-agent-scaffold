@@ -98,8 +98,10 @@ program.command("control")
   .description("Start the local Feishu profile control console")
   .option("--port <port>", "local HTTP port", parsePort, 4318)
   .option("--registry <path>", "local profile registry path")
-  .action(async ({ port, registry }) => {
-    const server = await startControlServer({ port, registryFile: registry });
+  .option("--allow-origin <url>", "trusted hosted UI origin (repeatable)", collectOption, [])
+  .action(async ({ port, registry, allowOrigin }) => {
+    const allowedOrigins = [...allowOrigin, ...splitEnvironmentList(process.env.FEISHU_CONTROL_ALLOWED_ORIGINS)];
+    const server = await startControlServer({ port, registryFile: registry, allowedOrigins });
     console.log(`Feishu Profile Control is running at ${server.url}`);
   });
 

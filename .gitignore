@@ -6,3 +6,7 @@ dist/
 coverage/
 *.log
 history-map.json
+.gstack/
+.vercel
+.env*
+public/
