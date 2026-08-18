@@ -1,4 +1,5 @@
-import { createLarkChannel, type LarkChannel, type NormalizedMessage } from "@larksuiteoapi/node-sdk";
+import { createLarkChannel, type LarkChannel, type NormalizedMessage, type RawMessageEvent } from "@larksuiteoapi/node-sdk";
+import { createHash } from "node:crypto";
 import type { Agent } from "../types.js";
 import type { AgentManifest } from "../agent-loader.js";
 import { ImageJobRunner } from "../media/jobs.js";
@@ -31,17 +32,31 @@ export async function startBot(options: BotOptions): Promise<LarkChannel> {
       dmMode: options.manifest.triggers.includes("direct-message") ? "open" : "disabled"
     },
     safety: { chatQueue: { enabled: true } },
-    outbound: { textChunkLimit: 4000 }
+    outbound: { textChunkLimit: 4000 },
+    // The Coding Agent authorization boundary needs the raw Open ID and
+    // tenant-stable union ID, rather than SDK fallbacks alone.
+    includeRawEvent: true
   });
 
   channel.on("message", async (message) => {
-    if (!shouldHandle(message, options.manifest)) return;
+    const eligible = shouldHandle(message, options.manifest);
+    const sender = resolveSenderIdentity(message);
+    logger.info("Feishu message received", {
+      chatType: message.chatType,
+      mentionedBot: message.mentionedBot,
+      eligible,
+      senderIdSource: sender.openId === message.senderId ? "normalized" : "raw-open-id",
+      senderOpenIdFingerprint: identifierFingerprint(sender.openId),
+      senderUnionIdFingerprint: sender.unionId ? identifierFingerprint(sender.unionId) : null
+    });
+    if (!eligible) return;
     try {
       const result = await options.agent.handle({
-        text: message.content.trim(),
+        text: stripBotMentions(message),
         chatId: message.chatId,
         messageId: message.messageId,
-        senderOpenId: message.senderId,
+        senderOpenId: sender.openId,
+        senderUnionId: sender.unionId,
         mentionsBot: message.mentionedBot
       });
       if (result.text?.trim()) await channel.send(message.chatId, { text: result.text.trim() }, { replyTo: message.messageId });
@@ -51,7 +66,7 @@ export async function startBot(options: BotOptions): Promise<LarkChannel> {
         const job = imageJobRunner.submit({
           idempotencyKey: message.messageId,
           request: result.image,
-          source: { chatId: message.chatId, messageId: message.messageId, senderOpenId: message.senderId }
+          source: { chatId: message.chatId, messageId: message.messageId, senderOpenId: sender.openId }
         }, {
           onSucceeded: async (completed) => {
             await replyGeneratedImages(imageGateway, completed.source.messageId, completed.images ?? []);
@@ -64,6 +79,7 @@ export async function startBot(options: BotOptions): Promise<LarkChannel> {
           await channel.send(message.chatId, { text: "已收到生图请求，正在生成。" }, { replyTo: message.messageId });
         }
       }
+      logger.info("Feishu message handled", { chatType: message.chatType });
     } catch (error) {
       logger.error("Agent message handling failed", error);
       await channel.send(message.chatId, { text: "处理这条消息时发生了错误，请稍后重试。" }, { replyTo: message.messageId });
@@ -73,4 +89,27 @@ export async function startBot(options: BotOptions): Promise<LarkChannel> {
   await channel.connect();
   logger.info(`Feishu bot connected for Agent: ${options.manifest.name}`);
   return channel;
+}
+
+export function resolveSenderOpenId(message: NormalizedMessage): string {
+  return resolveSenderIdentity(message).openId;
+}
+
+export function resolveSenderIdentity(message: NormalizedMessage): { openId: string; unionId?: string } {
+  const raw = message.raw as RawMessageEvent | undefined;
+  return {
+    openId: raw?.sender?.sender_id?.open_id || message.senderId,
+    unionId: raw?.sender?.sender_id?.union_id || undefined
+  };
+}
+
+export function stripBotMentions(message: NormalizedMessage): string {
+  const names = message.mentions
+    .filter((mention) => mention.isBot && mention.name)
+    .map((mention) => mention.name!);
+  return names.reduce((content, name) => content.replaceAll(`@${name}`, ""), message.content).trim();
+}
+
+function identifierFingerprint(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 12);
 }
