@@ -33,7 +33,7 @@
 # 首次执行会索引所有本地、含已归档的交互式会话；可先用 --limit 验证。
 npx tsx src/cli.ts codex map sync
 npx tsx src/cli.ts codex map search "飞书 agent"
-npx tsx src/cli.ts codex map show 019ffb0a-849c-7240-a08f-ca975fe171c6
+npx tsx src/cli.ts codex map show <thread-id>
 ```
 
 记忆标记含义：
@@ -42,7 +42,7 @@ npx tsx src/cli.ts codex map show 019ffb0a-849c-7240-a08f-ca975fe171c6
 - `checkpoint`：历史仍可恢复，地图持续记录变化；只在需要背景时恢复。
 - `none`：没有可读的持久回合或会话是临时的；地图保留元数据并说明无法恢复的原因。
 
-指定验收会话 `019ffb0a-849c-7240-a08f-ca975fe171c6` 会在 App Server 中以其本机标题、工作目录和 29 个可恢复回合出现。它是本功能的首个回归样本，而不是被复制到仓库的测试数据。
+将你自己的本地会话 ID 传给 `codex map show`。会话标题、工作目录、回合数量和内容只从当前机器的 Codex App Server 读取，不会写入本仓库；不要把真实个人会话 ID、对话摘录或历史地图提交到 Git。
 
 启动飞书 Coding Agent 前，机器管理员必须写出允许访问本机历史的飞书用户标识，以及允许开发的工作目录。多 application/profile 部署优先登记租户内稳定的 `union_id`；`open_id` 仅适用于用同一个飞书应用取得和接收事件的标识。不要用群成员列表、Bot 名称或 email 代替这些标识。
 
@@ -129,7 +129,7 @@ FEISHU_CONTROL_ALLOWED_ORIGINS=https://feishu-profile-control.vercel.app npm run
 需要 Node.js 20+、`lark-cli`，并已为当前飞书租户完成 CLI 配置。
 
 ```bash
-git clone <your-repository-url>
+git clone https://github.com/cadejay97-dotcom/feishu-agent-scaffold.git
 cd feishu-agent-scaffold
 npm ci
 cp .env.example .env
@@ -304,3 +304,7 @@ npm run check
 ```
 
 测试覆盖 Agent 默认模型注入、文本模型请求、Image 2 响应映射、Job 幂等、群聊/私聊触发策略和飞书图片消息编排。真实飞书发布仍需要租户内人工完成授权、权限配置、版本审批和一次 staging 对话验收。
+
+## 许可
+
+本仓库当前未附开源许可证。公开可见不代表授予复制、修改或再分发权；仓库所有者确定许可证后应在根目录补充 `LICENSE`。

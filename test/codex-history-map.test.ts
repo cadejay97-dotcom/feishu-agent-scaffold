@@ -7,7 +7,7 @@ import { CodexHistoryMap } from "../src/codex/history-map.js";
 import type { CodexRpcClient, CodexThread, CodexTurn } from "../src/codex/types.js";
 
 const acceptanceThread: CodexThread = {
-  id: "019ffb0a-849c-7240-a08f-ca975fe171c6",
+  id: "fixture-thread-acceptance",
   sessionId: "session-test",
   name: "Codex｜对话命名边界",
   preview: "通过飞书 Agent 恢复本地 Codex 对话",
