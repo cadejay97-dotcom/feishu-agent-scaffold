@@ -11,6 +11,7 @@
 - 用飞书官方 Node SDK 的 WebSocket 长连接接收消息、发送线程回复；生产运行时不调用 `lark-cli`。
 - OpenAI-compatible 模型适配器：OpenAI、DeepSeek、Kimi K3、GLM、MiMo，以及任意自定义兼容端点。
 - Anthropic Messages 适配器：Claude 系列。
+- Image 2 生图适配器：Agent 返回自然语言生图请求，脚手架异步调用 Image 2 并把图片回复到飞书。
 - Docker Compose 部署，以及 Agent 合约验证命令。
 
 `models.yaml` 只包含模型别名、端点和 API Key 环境变量名。真正的 Key 永远放在部署环境中。
@@ -54,6 +55,14 @@ npm start
 
 在群聊中 `@Bot` 即可触发；私聊是否触发由 Agent manifest 的 `triggers` 决定。
 
+要只验证生图媒体链路而不放入真实 Image 2 Key：
+
+```bash
+AGENT_DIR=./examples/image2-agent IMAGE_PROVIDER=fake npm start
+```
+
+这会使用 fake provider 返回测试 PNG；它能验证飞书上传/回复路径，但不能证明 Image 2 生成质量或真实 API 可用。
+
 ## Docker 部署
 
 先在 `.env` 填入 App 凭证、模型 Key，以及 Agent 文件夹的**绝对路径**：
@@ -90,12 +99,24 @@ my-agent/
 
 - `schemaVersion` 目前只能为 `1`。
 - `entry` 必须是 Agent 文件夹内部的 ES module，禁止 `../` 越界。
-- 入口模块必须导出 `createAgent(context)`；它返回一个带 `async handle(input)` 的对象，结果必须是 `{ text: string }`。
+- 入口模块必须导出 `createAgent(context)`；它返回一个带 `async handle(input)` 的对象。结果可以是文本，也可以包含一份生图请求：`{ text?: string, image?: { prompt, size?, quality? } }`。
 - `context.llm.chat({ messages, model?, temperature?, maxTokens? })` 是模型入口。未传 `model` 时使用 manifest 的 `defaultModel`，再回退到 `models.yaml` 的 `defaultModel`。
 - `triggers` 至少一个：`mention` 允许群 `@Bot`；`direct-message` 允许私聊。
 - Agent 自己依赖的 npm 包、二进制、网络权限、持久化、工具凭据与安全策略必须在 Agent 交付时明确并可部署。脚手架不安装、猜测或修复它们。
 
-参见可运行示例：[examples/echo-agent](examples/echo-agent)。
+参见可运行示例：[examples/echo-agent](examples/echo-agent) 和 [examples/image2-agent](examples/image2-agent)。
+
+### 生图 Agent
+
+`examples/image2-agent` 把飞书中的自然语言直接作为 Image 2 prompt。脚手架不替 Agent 改写提示词，也不额外调用聊天模型。运行时会先回复确认文本，再以飞书 `message_id` 做幂等键创建内存 Job，调用 Image 2，上传结果到飞书图片接口，并回复原消息。
+
+当前 Job Store 只在进程内存中，重启后任务不会恢复；这是 V1 的明确边界，不应伪装成生产队列。
+
+默认使用 `IMAGE_PROVIDER=image2`。本次不要求真实 API 凭证，未配置时收到生图请求会给出明确错误。要验证飞书图片上传链路，可设置 `IMAGE_PROVIDER=fake`；fake provider 只返回一张标记为测试的 1x1 PNG，不代表真实生图成功。
+
+Image 2 适配器使用最小的 OpenAI Images-compatible 请求：`POST {IMAGE2_BASE_URL}/images/generations`，发送 `model`、`prompt`、`size`、`quality` 和 `n: 1`，并兼容 `b64_json` 或临时 `url` 响应。若 Image 2 实际协议不同，只需替换 `src/media/image2.ts`，不改飞书入口和 Agent 契约。
+
+完整的 V1 范围、五步审视和真实验收门槛见 [docs/image2-v1.md](docs/image2-v1.md)。
 
 ## 不接收的 Agent 文件夹
 
@@ -155,4 +176,4 @@ claude:
 npm run check
 ```
 
-测试覆盖 Agent 默认模型注入、OpenAI-compatible 请求和 Anthropic Messages 请求。真实飞书发布需要租户内人工完成授权、权限配置和版本审批。
+测试覆盖 Agent 默认模型注入、文本模型请求、Image 2 响应映射、Job 幂等、群聊/私聊触发策略和飞书图片消息编排。真实飞书发布仍需要租户内人工完成授权、权限配置、版本审批和一次 staging 对话验收。

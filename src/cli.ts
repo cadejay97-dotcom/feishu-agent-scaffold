@@ -3,9 +3,9 @@ import "dotenv/config";
 import { spawn } from "node:child_process";
 import { Command } from "commander";
 import { loadAgent } from "./agent-loader.js";
-import { startBot } from "./lark/bot.js";
 import { readModelFile } from "./model/config.js";
 import { ModelRegistry } from "./model/registry.js";
+import { createImageProvider } from "./media/image2.js";
 
 const program = new Command();
 program.name("feishu-agent").description("Deploy a pre-adapted local Agent as a Feishu bot").version("0.1.0");
@@ -20,7 +20,8 @@ program.command("run")
     if (!agentDir) throw new Error("Set AGENT_DIR or pass --agent-dir");
     const llm = new ModelRegistry(await readModelFile(models));
     const { agent, manifest } = await loadAgent(agentDir, { llm, logger: console, agentRoot: "" });
-    await startBot({ appId, appSecret, agent, manifest, logger: console });
+    const { startBot } = await import("./lark/bot.js");
+    await startBot({ appId, appSecret, agent, manifest, imageProvider: createImageProvider(), logger: console });
   });
 
 program.command("bootstrap")

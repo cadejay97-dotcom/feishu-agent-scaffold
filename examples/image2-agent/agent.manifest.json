@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "name": "Image 2 Agent",
+  "description": "Passes a user's natural-language image request to the scaffold Image 2 adapter.",
+  "entry": "index.mjs",
+  "triggers": ["mention", "direct-message"]
+}
